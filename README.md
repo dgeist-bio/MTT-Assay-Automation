@@ -21,3 +21,9 @@ This tool **automates** the analysis of MTT assays exported from **Molecular Dev
 - **Pandas** for data processing
 - **Seaborn & Matplotlib** for data visualization
 - **Tkinter** for the graphical user interface
+
+## Installation for Mac Users:
+
+- Open Terminal.
+- Install dependencies: pip3 install pandas seaborn matplotlib
+- Run the app: python3 main_gui.py
