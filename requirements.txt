@@ -1,0 +1,6 @@
+customtkinter
+matplotlib
+seaborn
+pandas
+Pillow
+packaging
