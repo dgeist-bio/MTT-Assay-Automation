@@ -19,11 +19,14 @@ class MTTAnalyzerApp(ctk.CTk):
 
         # Fenster-Konfiguration
         self.title("MTT Auto-Analyzer v1.1 - Professional Edition")
-        self.geometry("500x350")
+        self.geometry("600x600")
 
         # Layout-Struktur
         self.label = ctk.CTkLabel(self, text="MTT-Daten Analyse", font=("Arial", 20, "bold"))
         self.label.pack(pady=(30, 10))
+
+        self.puro_wells = set()
+        self.create_plate_grid()
 
         self.sub_label = ctk.CTkLabel(self, text="Automatisierte Heatmap-Generierung (300dpi)", font=("Arial", 12))
         self.sub_label.pack(pady=(0, 20))
@@ -41,6 +44,36 @@ class MTTAnalyzerApp(ctk.CTk):
         self.progress = ctk.CTkProgressBar(self, width=300)
         self.progress.pack(pady=10)
         self.progress.set(0)
+
+    def create_plate_grid(self):
+        self.grid_frame = ctk.CTkFrame(self)
+        self.grid_frame.pack(pady=10, padx=10)
+
+        self.default_color = ctk.ThemeManager.theme["CTkButton"]["fg_color"]
+        self.accent_color = "red"
+        
+        rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+        for r_idx, row_label in enumerate(rows):
+            for c_idx in range(1, 13):
+                well_name = f"{row_label}{c_idx}"
+                btn = ctk.CTkButton(self.grid_frame, 
+                                    text=well_name, 
+                                    width=30, height=25, 
+                                    corner_radius=3)
+                
+                # Standardzustand (dein Theme-Blau)
+                btn.configure(fg_color=self.default_color)
+                btn.configure(command=lambda b=btn, name=well_name: self.toggle_well(b, name))
+                btn.grid(row=r_idx, column=c_idx, padx=1, pady=1)
+
+    def toggle_well(self, btn, name):
+        if name in self.puro_wells:
+            self.puro_wells.remove(name)
+            btn.configure(fg_color=self.default_color) # Zurück zum UI-Standard
+        else:
+            self.puro_wells.add(name)
+            btn.configure(fg_color="#E74C3C")
+        print(f"Puromycin-Wells aktuell: {self.puro_wells}")
 
         # Infotext unten
         self.info = ctk.CTkLabel(self, text="Speicherort: Desktop/MTT_Ergebnisse", font=("Arial", 10, "italic"))
@@ -72,7 +105,7 @@ class MTTAnalyzerApp(ctk.CTk):
             df = load_data(pfad)
             if df is None: continue
             
-            res, status_msg = calculate_viability(df)
+            res, status_msg = calculate_viability(df, self.puro_wells)
             basis_name = os.path.basename(pfad).split('.')[0]
 
             # Heatmap mit viridis
