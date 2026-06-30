@@ -1,0 +1,41 @@
+{"fonts": {
+    "font_family": "Arial",
+    "font_size": 20,
+    "font_weight": "normal",
+    "font_style": "normal"},
+
+"ui_defaults": {
+    "start_concentration": "20",
+    "export_path": "Desktop/MTT_Results",
+    "start_conc_text": "Startkonzentration",
+    "heatmap_text": "Automatisierte Heatmap-Generierung (300dpi)",
+    "font_main": ["Arial", 12]},
+
+"buttons": {
+    "button_color": "#007BFF",
+    "button_hover_color": "#0056b3",
+    "button_text_color": "#FFFFFF",
+    "button_font_family": "Arial",
+    "button_font_size": 12,
+    "button_font_weight": "bold",
+    "button_puro": "#488f8d",
+    "button_blank": "#537895",
+    "button_dmso": "#b5b35c",
+    "button_start": "#8a6d94"},
+
+"grid": {
+    "grid_color": "#E0E0E0",
+    "grid_line_width": 1,
+    "grid_cell_padding": 5,
+    "grid_row":0,
+    "grid_column":0,
+    "grid_cell_xpadding": 15,
+    "grid_cell_ypadding": 5},
+
+"buttons_confic": [
+            {"text": "Puromycin", "value": "puro",  "color_key": "button_puro"},
+            {"text": "Blank",      "value": "blank", "color_key": "button_blank"},
+            {"text": "DMSO",        "value": "dmso",  "color_key": "button_dmso"},
+            {"text": "Start-Triplet (Lila)", "value": "start", "color_key": "button_start"}
+        ]
+}

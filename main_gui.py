@@ -2,6 +2,7 @@ import sys
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import json
 import customtkinter as ctk 
 from tkinter import filedialog, messagebox
 
@@ -10,6 +11,13 @@ from data_loader import load_data
 import json
 from fpdf import FPDF
 
+def load_config(filename="config.json"):
+    if not os.path.exists(filename):
+        return {}
+    with open(filename, "r", encoding="utf-8") as f:
+        return json.load(f)
+    
+
 ctk.set_appearance_mode("dark")  
 ctk.set_default_color_theme("blue") 
 
@@ -17,10 +25,12 @@ class MTTAnalyzerApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        self.config = load_config()
+
         self.title("MTT Auto-Analyzer v1.3.0 - Professional Edition")
         self.geometry("900x900")
 
-        self.label = ctk.CTkLabel(self, text="MTT-Daten Analyse", font=("Arial", 20, "bold"))
+        self.label = ctk.CTkLabel(self, text="MTT-Daten Analyse", font=(self.config["fonts"]["font_family"], self.config["fonts"]["font_size"]))
         self.label.pack(pady=(20, 10))
 
         # Well-Speicher
@@ -34,22 +44,22 @@ class MTTAnalyzerApp(ctk.CTk):
         self.mode_frame.pack(pady=10)
         
         self.selection_mode = ctk.StringVar(value="puro")
-        
-        self.r_puro = ctk.CTkRadioButton(self.mode_frame, text="Puromycin (Brown)", 
-                                         variable=self.selection_mode, value="puro", fg_color="#D87320")
-        self.r_puro.grid(row=0, column=0, padx=15, pady=5)
-        
-        self.r_blank = ctk.CTkRadioButton(self.mode_frame, text="Blank (Blue)", 
-                                           variable=self.selection_mode, value="blank", fg_color="#CFCCFF")
-        self.r_blank.grid(row=0, column=1, padx=15, pady=5)
 
-        self.r_dmso = ctk.CTkRadioButton(self.mode_frame, text="DMSO (Red)", 
-                            variable=self.selection_mode, value="dmso", fg_color="#CC2E2E")
-        self.r_dmso.grid(row=0, column=2, padx=15, pady=5)
+        # 2. Extract grid settings once
+        g = self.config["grid"]
 
-        self.r_start = ctk.CTkRadioButton(self.mode_frame, text="Start-Triplet (Lila)", 
-                           variable=self.selection_mode, value="start", fg_color="#9B59B6")
-        self.r_start.grid(row=0, column=3, padx=15, pady=5)
+        # 3. Create buttons in a loop
+        for i, btn in enumerate(self.config["buttons_confic"]):
+            rb = ctk.CTkRadioButton(
+                self.mode_frame, 
+                text=btn["text"], 
+                variable=self.selection_mode, 
+                value=btn["value"], 
+                fg_color=self.config["buttons"][btn["color_key"]]
+            )
+    
+            # Using 'i' for column index to position them side-by-side
+            rb.grid(row=g["grid_row"], column=i, padx=g["grid_cell_xpadding"], pady=g["grid_cell_ypadding"])
 
         # ------------------------------------------
 
@@ -58,14 +68,16 @@ class MTTAnalyzerApp(ctk.CTk):
         self.conc_frame = ctk.CTkFrame(self)
         self.conc_frame.pack(pady=10)
 
-        self.conc_label = ctk.CTkLabel(self.conc_frame, text="Startkonzentration (µM):", font=("Arial", 12))
+        cfg = self.config["ui_defaults"]
+
+        self.conc_label = ctk.CTkLabel(self.conc_frame, text=cfg["start_conc_text"], font=tuple(cfg["font_main"]))
         self.conc_label.grid(row=0, column=0, padx=5, pady=5)
 
         self.start_conc = ctk.CTkEntry(self.conc_frame, width=120)
-        self.start_conc.insert(0, "10")
+        self.start_conc.insert(0, cfg["start_concentration"])
         self.start_conc.grid(row=0, column=1, padx=5, pady=5)
 
-        self.sub_label = ctk.CTkLabel(self, text="Automatisierte Heatmap-Generierung (300dpi)", font=("Arial", 12))
+        self.sub_label = ctk.CTkLabel(self, text=cfg["heatmap_text"], font=tuple(cfg["font_main"]))
         self.sub_label.pack(pady=(15, 5))
 
         self.btn = ctk.CTkButton(self, 
@@ -146,7 +158,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.puro_wells.add(name)
-                btn.configure(fg_color="#8C4C18")
+                btn.configure(fg_color=self.config["buttons"]["button_puro"])
 
         elif current_mode == "blank":
             self.puro_wells.discard(name)
@@ -157,7 +169,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.blank_wells.add(name)
-                btn.configure(fg_color="#CFCCFF")
+                btn.configure(fg_color=self.config["buttons"]["button_blank"])
 
         elif current_mode == "dmso":
             self.puro_wells.discard(name)
@@ -168,7 +180,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.dmso_wells.add(name)
-                btn.configure(fg_color="#CC2E2E")
+                btn.configure(fg_color=self.config["buttons"]["button_dmso"])
         elif current_mode == "start":
             # Selecting start triplet wells (max 3)
             self.puro_wells.discard(name)
