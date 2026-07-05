@@ -18,7 +18,7 @@ def load_config(filename="config.json"):
         return json.load(f)
     
 
-ctk.set_appearance_mode("dark")  
+ctk.set_appearance_mode("System")  # Modes: "System" (default), "Dark", "Light"
 ctk.set_default_color_theme("blue") 
 
 class MTTAnalyzerApp(ctk.CTk):
@@ -26,11 +26,14 @@ class MTTAnalyzerApp(ctk.CTk):
         super().__init__()
 
         self.config = load_config()
+        cfg = self.config["ui_defaults"]
+        fonts = self.config["fonts"]
+        btns = self.config["buttons"]
 
-        self.title("MTT Auto-Analyzer v1.3.0 - Professional Edition")
-        self.geometry("900x900")
+        self.title(cfg["title"])
+        self.geometry(cfg["geometry"])
 
-        self.label = ctk.CTkLabel(self, text="MTT-Daten Analyse", font=(self.config["fonts"]["font_family"], self.config["fonts"]["font_size"]))
+        self.label = ctk.CTkLabel(self, text=cfg["label_text"], font=(fonts["font_family"], fonts["font_size"]))
         self.label.pack(pady=(20, 10))
 
         # Well-Speicher
@@ -55,7 +58,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 text=btn["text"], 
                 variable=self.selection_mode, 
                 value=btn["value"], 
-                fg_color=self.config["buttons"][btn["color_key"]]
+                fg_color=btns[btn["color_key"]]
             )
     
             # Using 'i' for column index to position them side-by-side
@@ -68,7 +71,6 @@ class MTTAnalyzerApp(ctk.CTk):
         self.conc_frame = ctk.CTkFrame(self)
         self.conc_frame.pack(pady=10)
 
-        cfg = self.config["ui_defaults"]
 
         self.conc_label = ctk.CTkLabel(self.conc_frame, text=cfg["start_conc_text"], font=tuple(cfg["font_main"]))
         self.conc_label.grid(row=0, column=0, padx=5, pady=5)
@@ -81,7 +83,7 @@ class MTTAnalyzerApp(ctk.CTk):
         self.sub_label.pack(pady=(15, 5))
 
         self.btn = ctk.CTkButton(self, 
-                                text="DATEIEN AUSWÄHLEN & STARTEN", 
+                                text=btns["button_file_text"], 
                                 command=self.select_and_run,
                                 font=("Arial", 12, "bold"),
                                 height=45,
@@ -92,7 +94,7 @@ class MTTAnalyzerApp(ctk.CTk):
         self.progress.pack(pady=10)
         self.progress.set(0)
 
-        self.info = ctk.CTkLabel(self, text="Speicherort: Desktop/MTT_Ergebnisse", font=("Arial", 10, "italic"))
+        self.info = ctk.CTkLabel(self, text=cfg["save_path_text"], font=("Arial", 10, "italic"))
         self.info.pack(side="bottom", pady=15)
 
         self.export_frame = ctk.CTkFrame(self)
@@ -121,6 +123,14 @@ class MTTAnalyzerApp(ctk.CTk):
                                            height=35,
                                            corner_radius=8)
         self.load_json_button.grid(row=0, column=2, padx=10)
+
+        self.raw_json_button = ctk.CTkButton(self.export_frame,
+                                           text="Rohdaten JSON speichern",
+                                           command=self.save_raw_plate_json,
+                                           font=("Arial", 12),
+                                           height=35,
+                                           corner_radius=8)
+        self.raw_json_button.grid(row=0, column=3, padx=10)
 
         self.analysis_summary = None
         self.template_data = None
@@ -158,7 +168,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.puro_wells.add(name)
-                btn.configure(fg_color=self.config["buttons"]["button_puro"])
+                btn.configure(fg_color=btns["button_puro"])
 
         elif current_mode == "blank":
             self.puro_wells.discard(name)
@@ -169,7 +179,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.blank_wells.add(name)
-                btn.configure(fg_color=self.config["buttons"]["button_blank"])
+                btn.configure(fg_color=btns["button_blank"])
 
         elif current_mode == "dmso":
             self.puro_wells.discard(name)
@@ -180,7 +190,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.dmso_wells.add(name)
-                btn.configure(fg_color=self.config["buttons"]["button_dmso"])
+                btn.configure(fg_color=btns["button_dmso"])
         elif current_mode == "start":
             # Selecting start triplet wells (max 3)
             self.puro_wells.discard(name)
@@ -242,7 +252,8 @@ class MTTAnalyzerApp(ctk.CTk):
                 "start_triplet": list(self.start_triplet),
                 "start_concentration": self.start_conc.get(),
                 "active_file": os.path.basename(pfad),
-                "summary": summary
+                "summary": summary,
+                "raw_plate_data": summary.get("raw_plate_data"),
             }
             basis_name = os.path.basename(pfad).split('.')[0]
 
@@ -295,6 +306,27 @@ class MTTAnalyzerApp(ctk.CTk):
 
         messagebox.showinfo("JSON gespeichert", f"Die JSON-Vorlage wurde gespeichert: {json_path}")
 
+    def save_raw_plate_json(self):
+        if not self.analysis_summary:
+            messagebox.showwarning("Keine Analyse", "Bitte zuerst eine Analyse durchführen, damit die Rohdaten gespeichert werden können.")
+            return
+
+        output_folder = os.path.join(os.path.expanduser("~"), "Desktop", "MTT_Ergebnisse")
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+
+        base_name = self.template_data.get("active_file", "mtt_plate").split('.')[0] if self.template_data else "mtt_plate"
+        json_path = os.path.join(output_folder, f"{base_name}_raw_plate_data.json")
+        raw_plate_data = self.analysis_summary.get("raw_plate_data")
+        if not raw_plate_data:
+            messagebox.showwarning("Keine Rohdaten", "Für die aktuelle Analyse sind keine Rohdaten verfügbar.")
+            return
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(raw_plate_data, f, indent=2, ensure_ascii=False)
+
+        messagebox.showinfo("Rohdaten JSON gespeichert", f"Die Rohdaten wurden gespeichert: {json_path}")
+
     def load_template_json(self):
         json_path = filedialog.askopenfilename(
             title="JSON Vorlage laden",
@@ -311,6 +343,7 @@ class MTTAnalyzerApp(ctk.CTk):
         self.dmso_wells = set(data.get("dmso", []))
         self.template_data = data
         self.analysis_summary = data.get("summary")
+        self.last_loaded_json_path = json_path
         self.start_conc.delete(0, ctk.END)
         self.start_conc.insert(0, str(data.get("start_concentration", "10")))
         self.start_triplet = list(data.get("start_triplet", []))
@@ -333,7 +366,7 @@ class MTTAnalyzerApp(ctk.CTk):
             else:
                 btn.configure(fg_color=self.default_color)
 
-        messagebox.showinfo("JSON geladen", f"JSON-Vorlage erfolgreich geladen: {json_path}")
+        messagebox.showinfo("JSON geladen", f"JSON-Vorlage erfolgreich geladen: {getattr(self, 'last_loaded_json_path', 'unbekannt')}")
 
     def save_pdf_summary(self):
         if not self.analysis_summary:
@@ -353,6 +386,7 @@ class MTTAnalyzerApp(ctk.CTk):
         pdf.ln(4)
 
         pdf.set_font("Arial", size=12)
+
         def add_stat_block(name, stats):
             pdf.set_font("Arial", "B", 12)
             pdf.cell(0, 8, f"{name}", ln=True)
@@ -370,69 +404,164 @@ class MTTAnalyzerApp(ctk.CTk):
                 pdf.cell(0, 7, f"Viabilität: {stats['viability']:.2f}%", ln=True)
             pdf.ln(2)
 
+        def pdf_table(headers, rows, widths, aligns=None, header_fill=(230, 230, 230)):
+            if aligns is None:
+                aligns = ['L'] * len(headers)
+            pdf.set_font("Arial", "B", 11)
+            pdf.set_fill_color(*header_fill)
+            for header, width, align in zip(headers, widths, aligns):
+                pdf.cell(width, 8, header, border=1, align=align, fill=True)
+            pdf.ln()
+
+            pdf.set_font("Arial", size=10)
+            for row in rows:
+                for datum, width, align in zip(row, widths, aligns):
+                    pdf.cell(width, 7, str(datum), border=1, align=align)
+                pdf.ln()
+
         add_stat_block("Puromycin", self.analysis_summary.get("puro"))
         add_stat_block("DMSO", self.analysis_summary.get("dmso"))
+
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 8, "Qualitätskontrolle", ln=True)
+        pdf.set_font("Arial", size=11)
+        z_prime = self.analysis_summary.get("z_prime")
+        z_prime_valid = self.analysis_summary.get("z_prime_valid", False)
+        if z_prime is not None:
+            pdf.cell(0, 7, f"Z'-Prime: {z_prime:.3f} ({'gültig' if z_prime_valid else 'nicht gültig'})", ln=True)
+        else:
+            pdf.cell(0, 7, "Z'-Prime konnte nicht berechnet werden.", ln=True)
+        signal_to_background = self.analysis_summary.get("signal_to_background")
+        if signal_to_background is not None:
+            pdf.cell(0, 7, f"Signal-to-Background: {signal_to_background:.3f}", ln=True)
+        else:
+            pdf.cell(0, 7, "Signal-to-Background konnte nicht berechnet werden.", ln=True)
+        pdf.ln(2)
 
         dose_response = self.analysis_summary.get("dose_response")
         if dose_response:
             pdf.set_font("Arial", "B", 12)
             pdf.cell(0, 8, "Dose Response (Puromycin)", ln=True)
-            pdf.set_font("Arial", size=11)
+            pdf.ln(1)
+
+            headers = ["Konzentration (µM)", "Wells", "SD", "RSD (%)", "Viabilität (%)"]
+            widths = [35, 55, 30, 30, 40]
+            aligns = ['C', 'L', 'R', 'R', 'R']
+            rows = []
             for group in dose_response:
-                pdf.cell(0, 7, f"{group['concentration']:.3f} µM - Wells: {', '.join(group['wells'])}", ln=True)
-                pdf.cell(0, 7, f"  Mittelwert: {group['mean']:.3f}, Std: {group['std']:.3f}, RSD: {group['rel_std']:.2f}%", ln=True)
+                wells_text = ", ".join(group.get('wells', []))
+                rows.append([
+                    f"{group.get('concentration', 0):.3f}",
+                    wells_text,
+                    f"{group.get('std', 0.0):.3f}",
+                    f"{group.get('rel_std', 0.0):.2f}",
+                    f"{group.get('viability', 0.0):.2f}"
+                ])
+
+            pdf_table(headers, rows, widths, aligns)
             pdf.ln(2)
 
-            # prepare IC50 plot
             try:
-                xs = [g['concentration'] for g in dose_response]
-                reference_val = self.analysis_summary.get('reference_value', 1.0) or 1.0
-                ys = [(g['blank_corrected_mean'] / reference_val) * 100 for g in dose_response]
-                # compute IC50 by linear interpolation on log10 concentrations
-                import math
-                ic50 = None
-                for i in range(len(xs) - 1):
-                    y1, y2 = ys[i], ys[i+1]
-                    if (y1 >= 50 >= y2) or (y2 >= 50 >= y1):
-                        x1_log = math.log10(xs[i]) if xs[i] > 0 else None
-                        x2_log = math.log10(xs[i+1]) if xs[i+1] > 0 else None
-                        if x1_log is not None and x2_log is not None and y2 != y1:
-                            log_ic50 = x1_log + (50 - y1) * (x2_log - x1_log) / (y2 - y1)
-                            ic50 = 10 ** (log_ic50)
-                        break
+                import numpy as np
+                
+                # Datenstrukturen für das Plotten vorbereiten
+                xs = []
+                ys = []
+                yerrs = []
+                ref_val = self.analysis_summary.get("reference_value", 1.0) or 1.0
+                
+                for group in dose_response:
+                    if group.get('viability') is not None:
+                        xs.append(group['concentration'])
+                        ys.append(group['viability'])
+                        # Roh-Standardabweichung auf die Prozent-Skala der Viabilität normieren
+                        yerrs.append((group['std'] / ref_val) * 100)
+                
+                if len(ys) >= 4:
+                    # Professionelle Design-Richtlinien für wissenschaftliche Arbeiten anwenden
+                    plt.rcParams['font.family'] = 'sans-serif'
+                    plt.rcParams['font.sans-serif'] = ['Arial', 'Liberation Sans', 'DejaVu Sans']
+                    plt.rcParams['axes.edgecolor'] = '#333333'
+                    plt.rcParams['axes.linewidth'] = 1.2
+                    
+                    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+                    
+                    # 1. Reale Messpunkte mit präzisen Fehlerbalken darstellen (ohne Zickzack-Linie)
+                    ax.errorbar(xs, ys, yerr=yerrs, fmt='o', color='#1A365D', elinewidth=1.5, 
+                                capsize=3, capthick=1.2, ms=6, label='Messdaten (Triplikate)')
+                    
+                    # 2. Mathematisch exakte Regressionskurve auf Basis der Fit-Ergebnisse berechnen
+                    fit_summary = self.analysis_summary.get("dose_response_fit")
+                    if fit_summary:
+                        bottom = fit_summary.get("bottom")
+                        top = fit_summary.get("top")
+                        hill_slope = fit_summary.get("hill_slope")
+                        log_ic50 = fit_summary.get("log_ic50")
+                        
+                        # Generierung einer hochauflösenden logarithmischen Achsenskalierung für die Kurve
+                        x_smooth = np.logspace(np.log10(min(xs)), np.log10(max(xs)), 300)
+                        # Spiegelt exakt die log10-basierte 4PL-Funktion aus dose_response.py
+                        y_smooth = bottom + (top - bottom) / (1 + 10 ** ((np.log10(x_smooth) - log_ic50) * hill_slope))
+                        
+                        ax.plot(x_smooth, y_smooth, color='#E74C3C', lw=2, label='4PL-Regressionskurve')
+                        
+                        # Kennwerte sauber formatiert als Box in die Grafik einbetten
+                        textstr = '\n'.join((
+                            r'$IC_{10}: %.4g\ \mu\mathrm{M}$' % (fit_summary.get('ic10', 0),),
+                            r'$IC_{50}: %.4g\ \mu\mathrm{M}$' % (fit_summary.get('ic50', 0),),
+                            r'$IC_{90}: %.4g\ \mu\mathrm{M}$' % (fit_summary.get('ic90', 0),),
+                            r'$\mathrm{Hill-Slope}: %.2f$' % (fit_summary.get('hill_slope', 0),)
+                        ))
+                        props = dict(boxstyle='round,pad=0.5', facecolor='#F8F9FA', edgecolor='#E2E8F0', alpha=0.9)
+                        ax.text(0.05, 0.05, textstr, transform=ax.transAxes, fontsize=10, verticalalignment='bottom', bbox=props)
+                    else:
+                        # Fallback-Option falls die Regression fehlschlägt
+                        ax.plot(xs, ys, color='#E74C3C', ls='--', alpha=0.4, label='Trendlinie (unvollständiger Fit)')
+                    
+                    # Achsen-Kosmetik für den echten GraphPad Prism-Look
+                    ax.set_xscale('log')
+                    ax.set_xlabel('Konzentration (µM)', fontsize=11, fontweight='bold', labelpad=8)
+                    ax.set_ylabel('Zellviabilität (%)', fontsize=11, fontweight='bold', labelpad=8)
+                    
+                    # Äußeren Kasten aufbrechen (Top und Right Spines entfernen)
+                    ax.spines['top'].set_visible(False)
+                    ax.spines['right'].set_visible(False)
+                    
+                    # GraphPad Prism Charakteristika: 
+                    ax.grid(False) # <--- Hier wird das gestrichelte Raster komplett abgeschaltet!
+                    
+                    # Ticks nach außen zeigen lassen und Achsenlinien stärken
+                    ax.tick_params(direction='out', which='both', length=5, width=1.2, colors='#333333', labelsize=10)
+                    ax.tick_params(which='minor', length=3) # Auch kleine Zwischen-Ticks für Log-Skala
+                    
+                    ax.legend(loc='upper right', frameon=False, fontsize=10)
+                    
+                    plot_path = os.path.join(output_folder, 'mttexport_ic50_plot.png')
+                    fig.tight_layout()
+                    fig.savefig(plot_path, dpi=300)  # Gestochen scharfe 300 DPI für den PDF-Druck
+                    plt.close(fig)
 
-                # plot
-                fig, ax = plt.subplots(figsize=(6, 4))
-                ax.plot(xs, ys, marker='o')
-                ax.set_xscale('log')
-                ax.set_xlabel('Konzentration (µM)')
-                ax.set_ylabel('Viabilität (%)')
-                ax.set_title('Dose-Response')
-                ax.grid(True, which='both', ls='--', lw=0.5)
-                plot_path = os.path.join(output_folder, 'mttexport_ic50_plot.png')
-                fig.tight_layout()
-                fig.savefig(plot_path, dpi=150)
-                plt.close(fig)
-
-                # embed plot into PDF
-                try:
-                    pdf.add_page()
-                except Exception:
-                    pass
-                pdf.set_font("Arial", "B", 12)
-                pdf.cell(0, 8, "Dose-Response Plot & IC50", ln=True)
-                pdf.ln(2)
-                pdf.image(plot_path, x=15, w=180)
-                pdf.ln(4)
-                if ic50:
+                    try:
+                        pdf.add_page()
+                    except Exception:
+                        pass
+                    pdf.set_font("Arial", "B", 12)
+                    pdf.cell(0, 8, "Dose-Response Plot & IC-Kennwerte", ln=True)
+                    pdf.ln(2)
+                    pdf.image(plot_path, x=15, w=180)
+                    pdf.ln(4)
                     pdf.set_font("Arial", size=12)
-                    pdf.cell(0, 7, f"Geschätzte IC50: {ic50:.4g} µM", ln=True)
-                else:
-                    pdf.set_font("Arial", size=12)
-                    pdf.cell(0, 7, "IC50 konnte nicht interpoliert werden (kein 50% Schnittpunkt).", ln=True)
-                pdf.ln(4)
-            except Exception:
-                pass
+                    
+                    if fit_summary:
+                        pdf.cell(0, 7, f"IC10: {fit_summary.get('ic10'):.4g} µM", ln=True)
+                        pdf.cell(0, 7, f"IC50: {fit_summary.get('ic50'):.4g} µM", ln=True)
+                        pdf.cell(0, 7, f"IC90: {fit_summary.get('ic90'):.4g} µM", ln=True)
+                        pdf.cell(0, 7, f"Hill-Slope: {fit_summary.get('hill_slope'):.3f}", ln=True)
+                    else:
+                        pdf.cell(0, 7, "IC10/IC50/IC90 konnte nicht durch ein 4-Parameter-Logistik-Modell geschätzt werden.", ln=True)
+                    pdf.ln(4)
+            except Exception as e:
+                print(f"Fehler bei der Generierung des Publikationsplots: {e}")
 
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 8, "Berechnete Differenzen", ln=True)
@@ -442,6 +571,12 @@ class MTTAnalyzerApp(ctk.CTk):
             pdf.cell(0, 7, f"Viabilitätsdifferenz: {self.analysis_summary['viability_difference']:.2f}%", ln=True)
         else:
             pdf.cell(0, 7, "Nicht genügend Daten für Differenzberechnung.", ln=True)
+
+        auc_log10 = self.analysis_summary.get("auc_log10")
+        if auc_log10 is not None:
+            pdf.cell(0, 7, f"AUC (log10-skaliert): {auc_log10:.3f}", ln=True)
+        else:
+            pdf.cell(0, 7, "AUC konnte nicht berechnet werden.", ln=True)
 
         pdf.output(pdf_path)
         messagebox.showinfo("PDF gespeichert", f"Die PDF-Zusammenfassung wurde gespeichert: {pdf_path}")

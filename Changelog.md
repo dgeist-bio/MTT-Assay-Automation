@@ -1,3 +1,28 @@
+### Date: 05.07.2026 ###
+
+- Added calculations for IC10, IC50, IC90 and Area under curve (AUC) in the generated PDF summary
+- Cell Viabilty values are written in the generated PDF summary
+- Quality Control: Z'-Prime from DMSO vs. Puromycin is calculated, where values ≥ 0.5 are treated as valid.
+- Signal-to-backround (S/B) based on DMSO mean vs. blank mean
+- A 4-parameter logistic fit for the dose-response curve, including the Hill slope in the PDF
+- Export of raw data in JSON (for Blender): Full raw OD values for every well in the exported JSON payload
+- Area under the curve (AUC) on a log10-scaled concentration.
+- A new button in the GUI: JSON export for raw data added, which saves a separate JSON file named like [example]_raw_plate_data.json (contains full raw OD values for every well from the processed plate).
+- Added a formatted dose-response table to the exported PDF, where save_pdf_summary() now renders a table with columns, like Konzentration (µM), Wells, SD, RSD (%), Viablität (%). The table uses a header row with fill color and bordered cells for better readability.
+
+### Changes in the Python files ###
+- Added the new fitting logic in dose_response.py
+- Estended the analysis summary in analyzer.py
+- Updated the PDF export in main_gui.py
+- Added AUC calculation in anaylzer.py
+- Added raw plate export logic in analyzer.py
+- Included the AUC in the PDF summary and attached the raw plate data to the JSON export in main_gui.py
+- A dedictated export button in main_gui.py
+- A handler that writes the raw plate values to a standalone JSON file
+- Updating main_gui.py to save the loaded JSON path as self.last_loaded_json_path
+- Updated the success message to use that stored value instead of the undefined local variable
+- Added a regression test in test_dose_response.py
+
 - analyzer.py
     - Added describe_well_set() for mean, std, relative std, and blank-corrected mean.
     - Extended calculate_viability() to return:
@@ -20,8 +45,6 @@
 - requirements.txt
     - Added fpdf
 
-## **What changed**
-
 - main_gui.py
     - Removed control/medium selection
     - Added Blank selection mode
@@ -39,11 +62,19 @@
     - Added dose-response grouping from start concentration
     - Added per-triplicate mean/std/RSD output
 
-## **Result**
+### Export behaviour in JSON ###
+
+The JSON export now contains:
+- the selected well annotations
+- the full analysis summary
+- the raw OD values for all wells under the key raw_plate_daata
+
+### **Results** ###
 
 - GUI now supports only:
     - Puromycin
     - Blank
     - DMSO
+    - Start-Triplet
 - Start concentration is read from the GUI and used to compute half-dilution triplicates
 - The PDF summary includes dose-response statistics for the Puromycin groups

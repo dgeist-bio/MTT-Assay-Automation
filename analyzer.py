@@ -1,10 +1,14 @@
+import math
 import pandas as pd
 
+from dose_response import fit_four_parameter_logistic
+
+
 def parse_well_coordinates(well_string):
-    """Hilfsfunktion: Konvertiert 'E2' in (row_idx, col_idx)"""
-    row_char = well_string[0] # z.B. 'E'
-    col_idx = int(well_string[1:]) # z.B. '2' -> 1
-    row_idx = ord(row_char) - ord('A') # 'A'=0, 'B'=1
+    """Hilfsfunktion: Konvertiert 'E2' in (row_idx, col_idx)."""
+    row_char = well_string[0]
+    col_idx = int(well_string[1:])
+    row_idx = ord(row_char) - ord('A')
     return row_idx, col_idx
 
 
@@ -31,8 +35,9 @@ def describe_well_set(df, wells, blank):
         "std": float(std_raw),
         "rel_std": float(rel_std),
         "blank_corrected_mean": float(mean_raw - blank),
-        "values": [float(v) for v in values]
+        "values": [float(v) for v in values],
     }
+
 
 def parse_well_sort_key(well_string):
     row_char = well_string[0]
@@ -40,22 +45,18 @@ def parse_well_sort_key(well_string):
     return ord(row_char), col_idx
 
 
-def build_dose_response_from_start_triplet(df, start_triplet, blank, start_concentration):
+def build_dose_response_from_start_triplet(df, start_triplet, blank, start_concentration, reference_value=None):
     """
-    Builds dose-response groups starting from a vertical triplet (e.g. ['B3','C3','D3']).
-    Pattern: iterate columns from start column to column 11, for the same three rows (triplicate),
-    then move to the next block of three rows below and repeat (e.g. B/C/D -> E/F/G -> ...).
+    Builds dose-response groups starting from a vertical triplet.
     """
     if not start_triplet or start_concentration is None:
         return None
 
-    # Validate and parse start_triplet
     try:
         coords = [parse_well_coordinates(w) for w in start_triplet]
     except Exception:
         return None
 
-    # all columns should be equal for a vertical triplet
     cols = [c for r, c in coords]
     rows = [r for r, c in coords]
     if len(set(cols)) != 1:
@@ -63,7 +64,6 @@ def build_dose_response_from_start_triplet(df, start_triplet, blank, start_conce
 
     start_col = int(cols[0])
     start_row = min(rows)
-    # ensure rows are consecutive and form a block of 3
     sorted_rows = sorted(rows)
     if not (sorted_rows[1] == sorted_rows[0] + 1 and sorted_rows[2] == sorted_rows[1] + 1):
         return None
@@ -75,11 +75,10 @@ def build_dose_response_from_start_triplet(df, start_triplet, blank, start_conce
 
     dose_response = []
     max_col = 11
-    max_row_idx = 7  # rows A-H -> 0-7
+    max_row_idx = 7
 
     block_start = start_row
     while block_start <= max_row_idx - 2:
-        # for each column from start_col to max_col
         for col in range(start_col, max_col + 1):
             group_wells = []
             for r in range(block_start, block_start + 3):
@@ -88,19 +87,53 @@ def build_dose_response_from_start_triplet(df, start_triplet, blank, start_conce
 
             summary = describe_well_set(df, group_wells, blank)
             if summary is None:
-                # still append structure so indexing remains predictable
-                block_start += 0
                 continue
 
             summary["concentration"] = float(current_conc)
             summary["group_index"] = len(dose_response) + 1
             summary["wells"] = group_wells
+            if reference_value is not None:
+                try:
+                    summary["viability"] = float((summary["blank_corrected_mean"] / reference_value) * 100) if reference_value else None
+                except Exception:
+                    summary["viability"] = None
             dose_response.append(summary)
             current_conc = current_conc / 2
 
         block_start += 3
 
     return dose_response if dose_response else None
+
+
+def calculate_auc_log10(concentrations, values):
+    """Compute the area under the curve on a log10-scaled concentration axis."""
+    conc = sorted([float(c) for c in concentrations if c is not None and float(c) > 0], reverse=False)
+    vals = [float(v) for c, v in sorted(zip(concentrations, values), key=lambda item: float(item[0])) if float(c) > 0]
+
+    if len(conc) < 2:
+        return None
+
+    log_conc = [math.log10(c) for c in conc]
+    auc = 0.0
+    for i in range(1, len(log_conc)):
+        x0, x1 = log_conc[i - 1], log_conc[i]
+        y0, y1 = vals[i - 1], vals[i]
+        auc += (x1 - x0) * (y0 + y1) / 2.0
+    return float(auc)
+
+
+def collect_raw_plate_data(df):
+    """Return a JSON-serializable mapping of all raw OD values for all wells."""
+    rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    plate = {}
+    for row_idx, row_label in enumerate(rows):
+        row_data = {}
+        for col_idx in range(1, 13):
+            well_name = f"{row_label}{col_idx}"
+            value = df.iloc[row_idx, col_idx]
+            row_data[str(col_idx)] = float(value) if pd.notna(value) else None
+        plate[row_label] = row_data
+    return plate
 
 
 def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start_concentration=None, start_triplet=None, include_summary=False):
@@ -138,6 +171,45 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
         if puro_summary.get("viability") is not None and dmso_summary.get("viability") is not None:
             viability_diff = dmso_summary["viability"] - puro_summary["viability"]
 
+    dose_response = build_dose_response_from_start_triplet(
+        df,
+        start_triplet or [],
+        blank,
+        start_concentration,
+        reference_value=reference_val,
+    )
+
+    z_prime = None
+    z_prime_valid = False
+    if puro_summary and dmso_summary:
+        pos_mean = float(dmso_summary.get("blank_corrected_mean", 0.0) or 0.0)
+        neg_mean = float(puro_summary.get("blank_corrected_mean", 0.0) or 0.0)
+        pos_std = float(dmso_summary.get("std") or 0.0)
+        neg_std = float(puro_summary.get("std") or 0.0)
+        denominator = abs(pos_mean - neg_mean)
+        if denominator:
+            z_prime = 1 - ((3 * pos_std + 3 * neg_std) / denominator)
+            z_prime_valid = z_prime >= 0.5
+
+    signal_to_background = None
+    if dmso_summary and blank:
+        signal_to_background = float(dmso_summary.get("mean", 0.0) / blank) if blank else None
+
+    dose_response_fit = None
+    if dose_response:
+        concentrations = [group["concentration"] for group in dose_response]
+        viabilities = [group.get("viability") for group in dose_response if group.get("viability") is not None]
+        if len(viabilities) >= 4:
+            dose_response_fit = fit_four_parameter_logistic(concentrations, viabilities)
+
+    auc_log10 = None
+    if dose_response:
+        concentrations = [group.get("concentration") for group in dose_response]
+        values = [group.get("viability") for group in dose_response]
+        auc_log10 = calculate_auc_log10(concentrations, values)
+
+    raw_plate_data = collect_raw_plate_data(df)
+
     summary = {
         "blank": float(blank),
         "reference_name": reference_name,
@@ -146,7 +218,17 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
         "dmso": dmso_summary,
         "mean_difference_blank_corrected": float(mean_diff) if mean_diff is not None else None,
         "viability_difference": float(viability_diff) if viability_diff is not None else None,
-        "dose_response": build_dose_response_from_start_triplet(df, start_triplet or [], blank, start_concentration)
+        "dose_response": dose_response,
+        "z_prime": float(z_prime) if z_prime is not None else None,
+        "z_prime_valid": bool(z_prime_valid),
+        "signal_to_background": float(signal_to_background) if signal_to_background is not None else None,
+        "dose_response_fit": dose_response_fit,
+        "ic10": dose_response_fit["ic10"] if dose_response_fit else None,
+        "ic50": dose_response_fit["ic50"] if dose_response_fit else None,
+        "ic90": dose_response_fit["ic90"] if dose_response_fit else None,
+        "hill_slope": dose_response_fit["hill_slope"] if dose_response_fit else None,
+        "auc_log10": float(auc_log10) if auc_log10 is not None else None,
+        "raw_plate_data": raw_plate_data,
     }
 
     full_plate_viability = ((df.iloc[0:8, 1:13] - blank) / reference_val) * 100

@@ -5,10 +5,14 @@
     "font_style": "normal"},
 
 "ui_defaults": {
-    "start_concentration": "20",
+    "start_concentration": "10",
     "export_path": "Desktop/MTT_Results",
     "start_conc_text": "Startkonzentration",
     "heatmap_text": "Automatisierte Heatmap-Generierung (300dpi)",
+    "title": "MTT Auto-Analyzer v1.4.0 - Professional Edition",
+    "geometry": "900x900",
+    "label_text": "MTT-Daten Analyse",
+    "save_path_text": "Speicherort: Desktop/MTT_Ergebnisse",
     "font_main": ["Arial", 12]},
 
 "buttons": {
@@ -18,6 +22,7 @@
     "button_font_family": "Arial",
     "button_font_size": 12,
     "button_font_weight": "bold",
+    "button_file_text": "Datei auswählen & analysieren",
     "button_puro": "#488f8d",
     "button_blank": "#537895",
     "button_dmso": "#b5b35c",
