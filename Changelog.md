@@ -1,3 +1,7 @@
+### Date: 08.07.2026 ###
+
+- Bugfix: JSON self.config changed in main.gui
+
 ### Date: 05.07.2026 ###
 
 - Added calculations for IC10, IC50, IC90 and Area under curve (AUC) in the generated PDF summary

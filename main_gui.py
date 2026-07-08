@@ -28,7 +28,6 @@ class MTTAnalyzerApp(ctk.CTk):
         self.config = load_config()
         cfg = self.config["ui_defaults"]
         fonts = self.config["fonts"]
-        btns = self.config["buttons"]
 
         self.title(cfg["title"])
         self.geometry(cfg["geometry"])
@@ -53,12 +52,16 @@ class MTTAnalyzerApp(ctk.CTk):
 
         # 3. Create buttons in a loop
         for i, btn in enumerate(self.config["buttons_confic"]):
+
+            color_key = btn["color_key"]
+            actual_color = self.config["buttons"][color_key]
+            
             rb = ctk.CTkRadioButton(
                 self.mode_frame, 
                 text=btn["text"], 
                 variable=self.selection_mode, 
                 value=btn["value"], 
-                fg_color=btns[btn["color_key"]]
+                fg_color=actual_color
             )
     
             # Using 'i' for column index to position them side-by-side
@@ -83,7 +86,7 @@ class MTTAnalyzerApp(ctk.CTk):
         self.sub_label.pack(pady=(15, 5))
 
         self.btn = ctk.CTkButton(self, 
-                                text=btns["button_file_text"], 
+                                text=self.config["buttons"]["button_file_text"], 
                                 command=self.select_and_run,
                                 font=("Arial", 12, "bold"),
                                 height=45,
@@ -168,7 +171,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.puro_wells.add(name)
-                btn.configure(fg_color=btns["button_puro"])
+                btn.configure(fg_color=self.config["buttons"]["button_puro"])
 
         elif current_mode == "blank":
             self.puro_wells.discard(name)
@@ -179,7 +182,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.blank_wells.add(name)
-                btn.configure(fg_color=btns["button_blank"])
+                btn.configure(fg_color=self.config["buttons"]["button_blank"])
 
         elif current_mode == "dmso":
             self.puro_wells.discard(name)
@@ -190,7 +193,7 @@ class MTTAnalyzerApp(ctk.CTk):
                 btn.configure(fg_color=self.default_color)
             else:
                 self.dmso_wells.add(name)
-                btn.configure(fg_color=btns["button_dmso"])
+                btn.configure(fg_color=self.config["buttons"]["button_dmso"])
         elif current_mode == "start":
             # Selecting start triplet wells (max 3)
             self.puro_wells.discard(name)
