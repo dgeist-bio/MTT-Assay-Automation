@@ -22,6 +22,8 @@
     "button_font_family": "Arial",
     "button_font_size": 12,
     "button_font_weight": "bold",
+    "button_height": 45,
+    "button_corner_radius": 10,
     "button_file_text": "Datei auswählen & analysieren",
     "button_puro": "#488f8d",
     "button_blank": "#537895",

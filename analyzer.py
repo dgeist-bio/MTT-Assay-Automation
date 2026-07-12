@@ -36,6 +36,8 @@ def describe_well_set(df, wells, blank):
         "rel_std": float(rel_std),
         "blank_corrected_mean": float(mean_raw - blank),
         "values": [float(v) for v in values],
+        "e_min": float(min(values)),
+        "e_max": float(max(values)),
     }
 
 
@@ -202,6 +204,17 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
         if len(viabilities) >= 4:
             dose_response_fit = fit_four_parameter_logistic(concentrations, viabilities)
 
+    e_min = None
+    e_max = None
+    if dose_response_fit:
+        e_min = dose_response_fit.get("bottom")
+        e_max = dose_response_fit.get("top")
+    elif dose_response:
+        viabilities = [group.get("viability") for group in dose_response if group.get("viability") is not None]
+        if viabilities:
+            e_min = min(viabilities)
+            e_max = max(viabilities)
+
     auc_log10 = None
     if dose_response:
         concentrations = [group.get("concentration") for group in dose_response]
@@ -223,6 +236,10 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
         "z_prime_valid": bool(z_prime_valid),
         "signal_to_background": float(signal_to_background) if signal_to_background is not None else None,
         "dose_response_fit": dose_response_fit,
+        "e_min": float(e_min) if e_min is not None else None,
+        "e_max": float(e_max) if e_max is not None else None,
+        "E_min": float(e_min) if e_min is not None else None,
+        "E_max": float(e_max) if e_max is not None else None,
         "ic10": dose_response_fit["ic10"] if dose_response_fit else None,
         "ic50": dose_response_fit["ic50"] if dose_response_fit else None,
         "ic90": dose_response_fit["ic90"] if dose_response_fit else None,

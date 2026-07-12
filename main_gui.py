@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
@@ -19,15 +20,18 @@ def load_config(filename="config.json"):
     
 
 ctk.set_appearance_mode("System")  # Modes: "System" (default), "Dark", "Light"
-ctk.set_default_color_theme("blue") 
+ctk.set_default_color_theme("dark-blue") 
 
 class MTTAnalyzerApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        #Extracting configuration settings from the config.json file
         self.config = load_config()
         cfg = self.config["ui_defaults"]
         fonts = self.config["fonts"]
+        g = self.config["grid"]
+        btns = self.config["buttons"]
 
         self.title(cfg["title"])
         self.geometry(cfg["geometry"])
@@ -47,21 +51,18 @@ class MTTAnalyzerApp(ctk.CTk):
         
         self.selection_mode = ctk.StringVar(value="puro")
 
-        # 2. Extract grid settings once
-        g = self.config["grid"]
-
         # 3. Create buttons in a loop
         for i, btn in enumerate(self.config["buttons_confic"]):
 
-            color_key = btn["color_key"]
-            actual_color = self.config["buttons"][color_key]
+           # color_key = btn["color_key"]
+           # actual_color = self.config["buttons"][color_key]
             
             rb = ctk.CTkRadioButton(
                 self.mode_frame, 
                 text=btn["text"], 
                 variable=self.selection_mode, 
                 value=btn["value"], 
-                fg_color=actual_color
+                fg_color=btns["button_puro"]
             )
     
             # Using 'i' for column index to position them side-by-side
@@ -86,11 +87,11 @@ class MTTAnalyzerApp(ctk.CTk):
         self.sub_label.pack(pady=(15, 5))
 
         self.btn = ctk.CTkButton(self, 
-                                text=self.config["buttons"]["button_file_text"], 
+                                text=btns["button_file_text"], 
                                 command=self.select_and_run,
-                                font=("Arial", 12, "bold"),
-                                height=45,
-                                corner_radius=10)
+                                font=(btns["button_font_family"], btns["button_font_size"], btns["button_font_weight"]),
+                                height=btns["button_height"],
+                                corner_radius=btns["button_corner_radius"])
         self.btn.pack(pady=15)
 
         self.progress = ctk.CTkProgressBar(self, width=300)
@@ -103,37 +104,21 @@ class MTTAnalyzerApp(ctk.CTk):
         self.export_frame = ctk.CTkFrame(self)
         self.export_frame.pack(pady=10)
 
-        self.json_button = ctk.CTkButton(self.export_frame,
-                                        text="JSON Export speichern",
-                                        command=self.save_template_json,
-                                        font=("Arial", 12),
-                                        height=35,
-                                        corner_radius=8)
-        self.json_button.grid(row=0, column=0, padx=10)
-
-        self.pdf_button = ctk.CTkButton(self.export_frame,
-                                       text="PDF Summary speichern",
-                                       command=self.save_pdf_summary,
-                                       font=("Arial", 12),
-                                       height=35,
-                                       corner_radius=8)
-        self.pdf_button.grid(row=0, column=1, padx=10)
+        self.save_json_button = ctk.CTkButton(self.export_frame,
+                                             text="JSON Vorlage speichern",
+                                             command=self.save_template_json,
+                                             font=("Arial", 12),
+                                             height=35,
+                                             corner_radius=btns["button_corner_radius"])
+        self.save_json_button.grid(row=0, column=0, padx=5)
 
         self.load_json_button = ctk.CTkButton(self.export_frame,
                                            text="JSON Vorlage laden",
                                            command=self.load_template_json,
                                            font=("Arial", 12),
                                            height=35,
-                                           corner_radius=8)
-        self.load_json_button.grid(row=0, column=2, padx=10)
-
-        self.raw_json_button = ctk.CTkButton(self.export_frame,
-                                           text="Rohdaten JSON speichern",
-                                           command=self.save_raw_plate_json,
-                                           font=("Arial", 12),
-                                           height=35,
-                                           corner_radius=8)
-        self.raw_json_button.grid(row=0, column=3, padx=10)
+                                           corner_radius=btns["button_corner_radius"])
+        self.load_json_button.grid(row=0, column=1, padx=5)
 
         self.analysis_summary = None
         self.template_data = None
@@ -214,6 +199,20 @@ class MTTAnalyzerApp(ctk.CTk):
                     btn.configure(fg_color="#9B59B6")
         print(f"Puro-Wells: {self.puro_wells} | Blank-Wells: {self.blank_wells} | DMSO-Wells: {self.dmso_wells} | Start-Triplet: {self.start_triplet}")
 
+    def build_output_folder(self):
+        output_folder = os.path.join(os.path.expanduser("~"), "Desktop", "MTT_Ergebnisse")
+        os.makedirs(output_folder, exist_ok=True)
+        return output_folder
+
+    def build_template_payload(self):
+        return {
+            "puro": sorted(list(self.puro_wells)),
+            "blank": sorted(list(self.blank_wells)),
+            "dmso": sorted(list(self.dmso_wells)),
+            "start_triplet": list(self.start_triplet),
+            "start_concentration": self.start_conc.get(),
+        }
+
     def select_and_run(self):
         ausgewaehlte_dateien = filedialog.askopenfilenames(
             title="Wähle die Textdateien aus",
@@ -223,9 +222,7 @@ class MTTAnalyzerApp(ctk.CTk):
             self.run_full_analysis_flexible(ausgewaehlte_dateien)
 
     def run_full_analysis_flexible(self, dateiliste):
-        output_folder = os.path.join(os.path.expanduser("~"), "Desktop", "MTT_Ergebnisse")
-        if not os.path.exists(output_folder): 
-            os.makedirs(output_folder)
+        output_folder = self.build_output_folder()
 
         anzahl = len(dateiliste)
         erfolgreich_verarbeitet = 0
@@ -235,9 +232,9 @@ class MTTAnalyzerApp(ctk.CTk):
             self.update_idletasks()
 
             df = load_data(pfad)
-            if df is None: continue
+            if df is None:
+                continue
             
-            # ÜBERGABE AN RECHNER: Jetzt mit allen Well-Listen
             res, status_msg, summary = calculate_viability(
                 df,
                 self.puro_wells,
@@ -248,87 +245,52 @@ class MTTAnalyzerApp(ctk.CTk):
                 include_summary=True
             )
             self.analysis_summary = summary
-            self.template_data = {
-                "puro": sorted(list(self.puro_wells)),
-                "blank": sorted(list(self.blank_wells)),
-                "dmso": sorted(list(self.dmso_wells)),
-                "start_triplet": list(self.start_triplet),
-                "start_concentration": self.start_conc.get(),
-                "active_file": os.path.basename(pfad),
-                "summary": summary,
-                "raw_plate_data": summary.get("raw_plate_data"),
-            }
-            basis_name = os.path.basename(pfad).split('.')[0]
+            self.template_data = self.build_template_payload()
+            self.template_data["active_file"] = os.path.basename(pfad)
+            self.last_analysis_file_name = os.path.basename(pfad).split('.')[0]
+            basis_name = self.last_analysis_file_name
 
-            plt.figure(figsize=(10, 6.5))
-            sns.heatmap(res, annot=True, fmt=".1f", cmap='cividis', center=100, 
-                        xticklabels=range(1, 13), yticklabels=['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])
-            
- # Zerlegen des Status-Strings für die zweizeilige Darstellung
-            if "WARNUNG" in status_msg:
-                # Teilt den String beim Ausrufezeichen oder am DMSO-Start
-                if "DMSO-Kontrolle:" in status_msg:
-                    puro_part, dmso_part = status_msg.split("! ")
-                    titel_text = f"MTT: {basis_name}\n{puro_part}!\n{dmso_part}"
-                else:
-                    titel_text = f"MTT: {basis_name}\n{status_msg}"
-                
-                plt.title(titel_text, color='red', fontweight='bold', fontsize=12, pad=15)
-            else:
-                # Falls alles OK ist, aber DMSO-Werte da sind
-                status_clean = status_msg.replace("OK", "Status: OK (Puro-Check bestanden)")
-                status_clean = status_clean.replace(" DMSO-Kontrolle:", "\nDMSO-Kontrolle:")
-                plt.title(f"MTT: {basis_name}\n{status_clean}", fontsize=12, pad=15)
-
-            plt.xlabel('Spalte (1-12)')
-            plt.ylabel('Zeile (A-H)')
-
-            # WICHTIG: Verhindert das Abschneiden von mehrzeiligem Text
-            plt.tight_layout()
-
-            save_path = os.path.join(output_folder, f"{basis_name}.png")
-            plt.savefig(save_path, dpi=300)
-            plt.close()
+            self.save_raw_plate_json(summary=summary, base_name=basis_name, output_folder=output_folder)
+            self.save_pdf_summary(
+                summary=summary,
+                base_name=basis_name,
+                output_folder=output_folder,
+                heatmap_matrix=res,
+                status_msg=status_msg,
+            )
             erfolgreich_verarbeitet += 1
 
-        messagebox.showinfo("Erfolg", f"Analyse fertig!\n{erfolgreich_verarbeitet} Heatmaps wurden gespeichert.")
+        messagebox.showinfo("Erfolg", f"Analyse fertig!\n{erfolgreich_verarbeitet} PDFs wurden erstellt.")
         self.progress.set(0)
 
     def save_template_json(self):
-        if not self.template_data:
-            messagebox.showwarning("Keine Vorlage", "Bitte zuerst eine Analyse durchführen, damit die JSON-Vorlage erzeugt werden kann.")
-            return
-
-        output_folder = os.path.join(os.path.expanduser("~"), "Desktop", "MTT_Ergebnisse")
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
+        payload = self.build_template_payload()
+        output_folder = self.build_output_folder()
 
         json_path = os.path.join(output_folder, "mttexport_template.json")
         with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(self.template_data, f, indent=2, ensure_ascii=False)
+            json.dump(payload, f, indent=2, ensure_ascii=False)
 
         messagebox.showinfo("JSON gespeichert", f"Die JSON-Vorlage wurde gespeichert: {json_path}")
 
-    def save_raw_plate_json(self):
-        if not self.analysis_summary:
+    def save_raw_plate_json(self, summary=None, base_name=None, output_folder=None):
+        summary = summary or self.analysis_summary
+        if not summary:
             messagebox.showwarning("Keine Analyse", "Bitte zuerst eine Analyse durchführen, damit die Rohdaten gespeichert werden können.")
-            return
+            return None
 
-        output_folder = os.path.join(os.path.expanduser("~"), "Desktop", "MTT_Ergebnisse")
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
-
-        base_name = self.template_data.get("active_file", "mtt_plate").split('.')[0] if self.template_data else "mtt_plate"
+        output_folder = output_folder or self.build_output_folder()
+        base_name = base_name or self.last_analysis_file_name or "mtt_plate"
         json_path = os.path.join(output_folder, f"{base_name}_raw_plate_data.json")
-        raw_plate_data = self.analysis_summary.get("raw_plate_data")
+        raw_plate_data = summary.get("raw_plate_data")
         if not raw_plate_data:
             messagebox.showwarning("Keine Rohdaten", "Für die aktuelle Analyse sind keine Rohdaten verfügbar.")
-            return
+            return None
 
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(raw_plate_data, f, indent=2, ensure_ascii=False)
 
-        messagebox.showinfo("Rohdaten JSON gespeichert", f"Die Rohdaten wurden gespeichert: {json_path}")
+        return json_path
 
     def load_template_json(self):
         json_path = filedialog.askopenfilename(
@@ -371,24 +333,28 @@ class MTTAnalyzerApp(ctk.CTk):
 
         messagebox.showinfo("JSON geladen", f"JSON-Vorlage erfolgreich geladen: {getattr(self, 'last_loaded_json_path', 'unbekannt')}")
 
-    def save_pdf_summary(self):
-        if not self.analysis_summary:
+### Output PDF Summary Generation
+
+    def save_pdf_summary(self, summary=None, base_name=None, output_folder=None, heatmap_matrix=None, status_msg=None):
+        summary = summary or self.analysis_summary
+        if not summary:
             messagebox.showwarning("Keine Analyse", "Bitte zuerst eine Analyse durchführen.")
-            return
+            return None
 
-        output_folder = os.path.join(os.path.expanduser("~"), "Desktop", "MTT_Ergebnisse")
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
+        output_folder = output_folder or os.path.join(os.path.expanduser("~"), "Desktop", "MTT_Ergebnisse")
+        os.makedirs(output_folder, exist_ok=True)
+        pdf_path = os.path.join(output_folder, f"{base_name or self.last_analysis_file_name or 'mtt_plate'}_summary.pdf")
 
-        pdf_path = os.path.join(output_folder, "mttexport_summary.pdf")
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
         pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 10, "MTT Analyse Zusammenfassung", ln=True)
+        pdf.cell(0, 10, f"MTT Analyse Zusammenfassung - {base_name or self.last_analysis_file_name or 'mtt_plate'}", ln=True)
         pdf.ln(4)
 
         pdf.set_font("Arial", size=12)
+
+
 
         def add_stat_block(name, stats):
             pdf.set_font("Arial", "B", 12)
@@ -403,6 +369,8 @@ class MTTAnalyzerApp(ctk.CTk):
             pdf.cell(0, 7, f"Standardabweichung: {stats['std']:.3f}", ln=True)
             pdf.cell(0, 7, f"Relative Standardabweichung: {stats['rel_std']:.2f}%", ln=True)
             pdf.cell(0, 7, f"Blank-korrigierter Mittelwert: {stats['blank_corrected_mean']:.3f}", ln=True)
+            pdf.cell(0, 7, f"Minimaler Effekt: {stats['e_min']:.3f}", ln=True)
+            pdf.cell(0, 7, f"Maximaler Effekt: {stats['e_max']:.3f}", ln=True)
             if stats.get('viability') is not None:
                 pdf.cell(0, 7, f"Viabilität: {stats['viability']:.2f}%", ln=True)
             pdf.ln(2)
@@ -464,125 +432,126 @@ class MTTAnalyzerApp(ctk.CTk):
             pdf_table(headers, rows, widths, aligns)
             pdf.ln(2)
 
+        raw_plate_data = summary.get("raw_plate_data") or {}
+        if raw_plate_data:
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 8, "Rohdaten der Platte", ln=True)
+            pdf.set_font("Arial", size=7)
+            column_headers = ["Row\\Col"] + [str(col) for col in range(1, 13)]
+            widths = [14] + [10] * 12
+            for header, width in zip(column_headers, widths):
+                pdf.cell(width, 6, header, border=1, align="C", fill=True)
+            pdf.ln()
+            for row in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
+                pdf.cell(widths[0], 6, row, border=1, align="C")
+                row_values = raw_plate_data.get(row, {})
+                for col in range(1, 13):
+                    value = row_values.get(str(col), row_values.get(col, ""))
+                    if isinstance(value, (int, float)):
+                        text = f"{value:.4f}"
+                    else:
+                        text = str(value)
+                    pdf.cell(widths[col], 6, text, border=1, align="C")
+                pdf.ln()
+            pdf.ln(2)
+
+        fit_summary = summary.get("dose_response_fit")
+        if dose_response and fit_summary:
             try:
                 import numpy as np
-                
-                # Datenstrukturen für das Plotten vorbereiten
-                xs = []
-                ys = []
+
+                xs = [group.get("concentration") for group in dose_response if group.get("viability") is not None]
+                ys = [group.get("viability") for group in dose_response if group.get("viability") is not None]
                 yerrs = []
-                ref_val = self.analysis_summary.get("reference_value", 1.0) or 1.0
-                
+                ref_val = summary.get("reference_value", 1.0) or 1.0
                 for group in dose_response:
-                    if group.get('viability') is not None:
-                        xs.append(group['concentration'])
-                        ys.append(group['viability'])
-                        # Roh-Standardabweichung auf die Prozent-Skala der Viabilität normieren
-                        yerrs.append((group['std'] / ref_val) * 100)
-                
-                if len(ys) >= 4:
-                    # Professionelle Design-Richtlinien für wissenschaftliche Arbeiten anwenden
+                    if group.get("viability") is not None:
+                        yerrs.append((group.get("std", 0.0) / ref_val) * 100)
+
+                if len(xs) >= 4:
                     plt.rcParams['font.family'] = 'sans-serif'
                     plt.rcParams['font.sans-serif'] = ['Arial', 'Liberation Sans', 'DejaVu Sans']
-                    plt.rcParams['axes.edgecolor'] = '#333333'
-                    plt.rcParams['axes.linewidth'] = 1.2
-                    
-                    fig, ax = plt.subplots(figsize=(6.5, 4.5))
-                    
-                    # 1. Reale Messpunkte mit präzisen Fehlerbalken darstellen (ohne Zickzack-Linie)
-                    ax.errorbar(xs, ys, yerr=yerrs, fmt='o', color='#1A365D', elinewidth=1.5, 
-                                capsize=3, capthick=1.2, ms=6, label='Messdaten (Triplikate)')
-                    
-                    # 2. Mathematisch exakte Regressionskurve auf Basis der Fit-Ergebnisse berechnen
-                    fit_summary = self.analysis_summary.get("dose_response_fit")
-                    if fit_summary:
-                        bottom = fit_summary.get("bottom")
-                        top = fit_summary.get("top")
-                        hill_slope = fit_summary.get("hill_slope")
-                        log_ic50 = fit_summary.get("log_ic50")
-                        
-                        # Generierung einer hochauflösenden logarithmischen Achsenskalierung für die Kurve
-                        x_smooth = np.logspace(np.log10(min(xs)), np.log10(max(xs)), 300)
-                        # Spiegelt exakt die log10-basierte 4PL-Funktion aus dose_response.py
-                        y_smooth = bottom + (top - bottom) / (1 + 10 ** ((np.log10(x_smooth) - log_ic50) * hill_slope))
-                        
-                        ax.plot(x_smooth, y_smooth, color='#E74C3C', lw=2, label='4PL-Regressionskurve')
-                        
-                        # Kennwerte sauber formatiert als Box in die Grafik einbetten
-                        textstr = '\n'.join((
-                            r'$IC_{10}: %.4g\ \mu\mathrm{M}$' % (fit_summary.get('ic10', 0),),
-                            r'$IC_{50}: %.4g\ \mu\mathrm{M}$' % (fit_summary.get('ic50', 0),),
-                            r'$IC_{90}: %.4g\ \mu\mathrm{M}$' % (fit_summary.get('ic90', 0),),
-                            r'$\mathrm{Hill-Slope}: %.2f$' % (fit_summary.get('hill_slope', 0),)
-                        ))
-                        props = dict(boxstyle='round,pad=0.5', facecolor='#F8F9FA', edgecolor='#E2E8F0', alpha=0.9)
-                        ax.text(0.05, 0.05, textstr, transform=ax.transAxes, fontsize=10, verticalalignment='bottom', bbox=props)
-                    else:
-                        # Fallback-Option falls die Regression fehlschlägt
-                        ax.plot(xs, ys, color='#E74C3C', ls='--', alpha=0.4, label='Trendlinie (unvollständiger Fit)')
-                    
-                    # Achsen-Kosmetik für den echten GraphPad Prism-Look
+                    fig, ax = plt.subplots(figsize=(6.8, 4.5))
+                    ax.errorbar(xs, ys, yerr=yerrs, fmt='o', color='#1A365D', elinewidth=1.4, capsize=3, capthick=1.2, ms=6, label='Messdaten')
+
+                    bottom = fit_summary.get("bottom")
+                    top = fit_summary.get("top")
+                    hill_slope = fit_summary.get("hill_slope")
+                    log_ic50 = fit_summary.get("log_ic50")
+                    x_smooth = np.logspace(np.log10(min(xs)), np.log10(max(xs)), 300)
+                    y_smooth = bottom + (top - bottom) / (1 + 10 ** ((np.log10(x_smooth) - log_ic50) * hill_slope))
+                    ax.plot(x_smooth, y_smooth, color='#E74C3C', lw=2, label='4PL-Fit')
+
                     ax.set_xscale('log')
-                    ax.set_xlabel('Konzentration (µM)', fontsize=11, fontweight='bold', labelpad=8)
-                    ax.set_ylabel('Zellviabilität (%)', fontsize=11, fontweight='bold', labelpad=8)
-                    
-                    # Äußeren Kasten aufbrechen (Top und Right Spines entfernen)
+                    ax.set_xlabel('Konzentration (µM)')
+                    ax.set_ylabel('Zellviabilität (%)')
+                    ax.set_title('Dose-Response / 4-Parameter-Logistic Fit')
                     ax.spines['top'].set_visible(False)
                     ax.spines['right'].set_visible(False)
-                    
-                    # GraphPad Prism Charakteristika: 
-                    ax.grid(False) # <--- Hier wird das gestrichelte Raster komplett abgeschaltet!
-                    
-                    # Ticks nach außen zeigen lassen und Achsenlinien stärken
-                    ax.tick_params(direction='out', which='both', length=5, width=1.2, colors='#333333', labelsize=10)
-                    ax.tick_params(which='minor', length=3) # Auch kleine Zwischen-Ticks für Log-Skala
-                    
-                    ax.legend(loc='upper right', frameon=False, fontsize=10)
-                    
-                    plot_path = os.path.join(output_folder, 'mttexport_ic50_plot.png')
+                    ax.grid(False)
+                    ax.legend(loc='best')
+                    textstr = '\n'.join([
+                        f"IC10: {fit_summary.get('ic10'):.4g} µM",
+                        f"IC50: {fit_summary.get('ic50'):.4g} µM",
+                        f"IC90: {fit_summary.get('ic90'):.4g} µM",
+                        f"Hill-Slope: {fit_summary.get('hill_slope'):.3f}",
+                    ])
+                    props = dict(boxstyle='round,pad=0.35', facecolor='#F8F9FA', edgecolor='#D0D7DE', alpha=0.95)
+                    ax.text(0.05, 0.05, textstr, transform=ax.transAxes, fontsize=9, verticalalignment='bottom', bbox=props)
+
                     fig.tight_layout()
-                    fig.savefig(plot_path, dpi=300)  # Gestochen scharfe 300 DPI für den PDF-Druck
+                    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                        plot_path = tmp.name
+                    fig.savefig(plot_path, dpi=300)
                     plt.close(fig)
 
-                    try:
-                        pdf.add_page()
-                    except Exception:
-                        pass
+                    pdf.add_page()
                     pdf.set_font("Arial", "B", 12)
-                    pdf.cell(0, 8, "Dose-Response Plot & IC-Kennwerte", ln=True)
-                    pdf.ln(2)
-                    pdf.image(plot_path, x=15, w=180)
-                    pdf.ln(4)
-                    pdf.set_font("Arial", size=12)
-                    
-                    if fit_summary:
-                        pdf.cell(0, 7, f"IC10: {fit_summary.get('ic10'):.4g} µM", ln=True)
-                        pdf.cell(0, 7, f"IC50: {fit_summary.get('ic50'):.4g} µM", ln=True)
-                        pdf.cell(0, 7, f"IC90: {fit_summary.get('ic90'):.4g} µM", ln=True)
-                        pdf.cell(0, 7, f"Hill-Slope: {fit_summary.get('hill_slope'):.3f}", ln=True)
-                    else:
-                        pdf.cell(0, 7, "IC10/IC50/IC90 konnte nicht durch ein 4-Parameter-Logistik-Modell geschätzt werden.", ln=True)
-                    pdf.ln(4)
-            except Exception as e:
-                print(f"Fehler bei der Generierung des Publikationsplots: {e}")
+                    pdf.cell(0, 8, "Graphical Abstract", ln=True)
+                    pdf.image(plot_path, x=12, y=20, w=186)
+                    os.remove(plot_path)
+            except Exception as exc:
+                print(f"Fehler bei der Graphik-Erzeugung: {exc}")
 
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 8, "Berechnete Differenzen", ln=True)
-        pdf.set_font("Arial", size=11)
-        if self.analysis_summary.get("mean_difference_blank_corrected") is not None:
-            pdf.cell(0, 7, f"Mittelwert DMSO - Mittelwert Puro (blank-korrigiert): {self.analysis_summary['mean_difference_blank_corrected']:.3f}", ln=True)
-            pdf.cell(0, 7, f"Viabilitätsdifferenz: {self.analysis_summary['viability_difference']:.2f}%", ln=True)
-        else:
-            pdf.cell(0, 7, "Nicht genügend Daten für Differenzberechnung.", ln=True)
+        if heatmap_matrix is not None:
+            try:
+                import numpy as np
 
-        auc_log10 = self.analysis_summary.get("auc_log10")
-        if auc_log10 is not None:
-            pdf.cell(0, 7, f"AUC (log10-skaliert): {auc_log10:.3f}", ln=True)
-        else:
-            pdf.cell(0, 7, "AUC konnte nicht berechnet werden.", ln=True)
+                plt.rcParams['font.family'] = 'sans-serif'
+                plt.rcParams['font.sans-serif'] = ['Arial', 'Liberation Sans', 'DejaVu Sans']
+                fig, ax = plt.subplots(figsize=(7.2, 5.2))
+                sns.heatmap(
+                    np.array(heatmap_matrix, dtype=float),
+                    ax=ax,
+                    cmap='viridis',
+                    cbar=True,
+                    cbar_kws={'label': 'Zellviabilität (%)'},
+                    annot=True,
+                    fmt='.2f',
+                    annot_kws={'size': 7},
+                    xticklabels=[str(i) for i in range(1, 13)],
+                    yticklabels=['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+                )
+                ax.set_title('Heatmap der Zellviabilität')
+                ax.set_xlabel('Spalte (1-12)')
+                ax.set_ylabel('Zeile (A-H)')
+                fig.tight_layout()
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                    plot_path = tmp.name
+                fig.savefig(plot_path, dpi=300)
+                plt.close(fig)
+
+                pdf.add_page()
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Heatmap der Zellviabilität", ln=True)
+                pdf.image(plot_path, x=15, y=24, w=180)
+                os.remove(plot_path)
+            except Exception as exc:
+                print(f"Fehler bei der Heatmap-Erzeugung: {exc}")
 
         pdf.output(pdf_path)
-        messagebox.showinfo("PDF gespeichert", f"Die PDF-Zusammenfassung wurde gespeichert: {pdf_path}")
+        return pdf_path
 
 if __name__ == "__main__":
     app = MTTAnalyzerApp()

@@ -1,3 +1,18 @@
+### Date: 12.07.2026 ###
+
+- Changed the output from a PNG file to a complete PDF summary per file with the embedded heatmap.
+- Removed the separate manual "PDF Summary speichern" and "Rohdaten JSON speichern" buttons, since in the workflow it is no longer needed, because those files are produced during analysis.
+- Gives the minimal and maximal Values. Needs to be changed for E_min and E_max
+- "JSON Export speichern" now writes only the selected well layout and start concentration, so it can be reloaded with "JSON Vorlage laden".
+- Further re-factoring of the values to config.json
+
+Updated files:
+- main_gui.py
+- analyzer.py
+- test-dose-response
+- config.json
+- Changelog.md
+
 ### Date: 08.07.2026 ###
 
 - Bugfix: JSON self.config changed in main.gui
