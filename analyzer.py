@@ -242,6 +242,8 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
         "E_max": float(e_max) if e_max is not None else None,
         "ic10": dose_response_fit["ic10"] if dose_response_fit else None,
         "ic50": dose_response_fit["ic50"] if dose_response_fit else None,
+        "ic50_absolute": dose_response_fit["ic50_absolute"] if dose_response_fit else None,
+        "ic50_relative": dose_response_fit["ic50_relative"] if dose_response_fit else None,
         "ic90": dose_response_fit["ic90"] if dose_response_fit else None,
         "hill_slope": dose_response_fit["hill_slope"] if dose_response_fit else None,
         "auc_log10": float(auc_log10) if auc_log10 is not None else None,

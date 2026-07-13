@@ -1,3 +1,16 @@
+### Date: 13.07.2026 ###
+
+- Added IC50 absolute & relative, as well E_min and E_max to the 4PL fit output.
+- Added Date & Time, as well page count in the PDF footer.
+- Added a fit metrics block to the PDF containing E_min, E_max, absolute IC50, relative IC50, and IC10/IC90.
+
+
+Updated files:
+
+- dose_response.py
+- analyzer.py
+- main_gui.py
+
 ### Date: 12.07.2026 ###
 
 - Changed the output from a PNG file to a complete PDF summary per file with the embedded heatmap.

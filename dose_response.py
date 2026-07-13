@@ -64,9 +64,11 @@ def fit_four_parameter_logistic(concentrations, responses):
     if hill_slope == 0:
         ic10 = None
         ic90 = None
+        ic50_relative = None
     else:
         ic10 = 10 ** (log_ic50 + math.log10(9) / hill_slope)
         ic90 = 10 ** (log_ic50 - math.log10(9) / hill_slope)
+        ic50_relative = ic50
 
     return {
         "bottom": float(bottom),
@@ -74,6 +76,10 @@ def fit_four_parameter_logistic(concentrations, responses):
         "hill_slope": float(hill_slope),
         "log_ic50": float(log_ic50),
         "ic50": float(ic50),
+        "ic50_absolute": float(ic50),
+        "ic50_relative": float(ic50_relative) if ic50_relative is not None else None,
         "ic10": float(ic10) if ic10 is not None else None,
         "ic90": float(ic90) if ic90 is not None else None,
+        "e_min": float(bottom),
+        "e_max": float(top),
     }

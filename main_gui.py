@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import json
+from datetime import datetime
 import customtkinter as ctk 
 from tkinter import filedialog, messagebox
 
@@ -11,6 +12,17 @@ from analyzer import calculate_viability
 from data_loader import load_data
 import json
 from fpdf import FPDF
+
+class PdfWithFooter(FPDF):
+    def __init__(self, generated_at, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.generated_at = generated_at
+
+    def footer(self):
+        self.set_y(-12)
+        self.set_font("Arial", "I", 8)
+        footer_text = f"{self.generated_at.strftime('%d.%m.%Y %H:%M:%S')} | Seite {self.page_no()}/{{nb}}"
+        self.cell(0, 10, footer_text, align='C')
 
 def load_config(filename="config.json"):
     if not os.path.exists(filename):
@@ -345,7 +357,9 @@ class MTTAnalyzerApp(ctk.CTk):
         os.makedirs(output_folder, exist_ok=True)
         pdf_path = os.path.join(output_folder, f"{base_name or self.last_analysis_file_name or 'mtt_plate'}_summary.pdf")
 
-        pdf = FPDF()
+        generated_at = datetime.now()
+        pdf = PdfWithFooter(generated_at)
+        pdf.alias_nb_pages()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
         pdf.set_font("Arial", "B", 14)
@@ -431,6 +445,21 @@ class MTTAnalyzerApp(ctk.CTk):
 
             pdf_table(headers, rows, widths, aligns)
             pdf.ln(2)
+
+            fit_summary = summary.get("dose_response_fit")
+            if fit_summary:
+                pdf.set_font("Arial", "B", 12)
+                pdf.cell(0, 8, "Fit-Metriken", ln=True)
+                pdf.set_font("Arial", size=11)
+                pdf.cell(0, 7, f"E_min (curve): {fit_summary.get('e_min', 0.0):.3f}", ln=True)
+                pdf.cell(0, 7, f"E_max (curve): {fit_summary.get('e_max', 0.0):.3f}", ln=True)
+                pdf.cell(0, 7, f"Absolute IC50: {fit_summary.get('ic50_absolute', 0.0):.4g} µM", ln=True)
+                pdf.cell(0, 7, f"Relative IC50: {fit_summary.get('ic50_relative', 0.0):.4g} µM", ln=True)
+                if fit_summary.get('ic10') is not None:
+                    pdf.cell(0, 7, f"IC10: {fit_summary.get('ic10'):.4g} µM", ln=True)
+                if fit_summary.get('ic90') is not None:
+                    pdf.cell(0, 7, f"IC90: {fit_summary.get('ic90'):.4g} µM", ln=True)
+                pdf.ln(2)
 
         raw_plate_data = summary.get("raw_plate_data") or {}
         if raw_plate_data:
