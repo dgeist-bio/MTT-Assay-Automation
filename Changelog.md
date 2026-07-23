@@ -1,4 +1,23 @@
-### Date: 13.07.2026 ###
+### Date 2026-07-23 - v1.7.0 ###
+
+- Added a checkbox for puromycin-based cell viability. The checkbox changes the calculation of the cell viability: Substracting the mean puro values from the values of the wells of DMSO (=living cells). It then calculates the cellviability of the mean values of the triplicates to a puromycin-based viability, where the value of the living cells is substracted from the triplicates.
+- Added mean values of the wells in the pdf executive summary
+- Added an explanation when puromycin baseline correction is active
+- Changed the layout of the generated pdf executive summary
+
+Updated files:
+
+- main_gui.py
+- pdf_summary.py
+- analyzer.py
+- config.json
+- Changelog.md
+
+The main_gui was splitted to main_gui.py and pdf_summary.py for the output of the generated pdf file. The file analyzer.py computes the calculation of DMSO minus Puromycin baseline when checkbox is enabled, as well calculating the dose-response group means and viabilities from corrected values.
+The file pdf_summary.py displays an explanation when puromycin baseline correction is active and shows corrected mean values in the dose-response overview table.
+
+
+### Date: 13.07.2026 - v1.6.0 ###
 
 - Added IC50 absolute & relative, as well E_min and E_max to the 4PL fit output.
 - Added Date & Time, as well page count in the PDF footer.
@@ -11,7 +30,7 @@ Updated files:
 - analyzer.py
 - main_gui.py
 
-### Date: 12.07.2026 ###
+### Date: 12.07.2026 v1.5.0 ###
 
 - Changed the output from a PNG file to a complete PDF summary per file with the embedded heatmap.
 - Removed the separate manual "PDF Summary speichern" and "Rohdaten JSON speichern" buttons, since in the workflow it is no longer needed, because those files are produced during analysis.
@@ -26,11 +45,11 @@ Updated files:
 - config.json
 - Changelog.md
 
-### Date: 08.07.2026 ###
+### Date: 08.07.2026 v1.4.1 ###
 
 - Bugfix: JSON self.config changed in main.gui
 
-### Date: 05.07.2026 ###
+### Date: 05.07.2026 v1.4.0 ###
 
 - Added calculations for IC10, IC50, IC90 and Area under curve (AUC) in the generated PDF summary
 - Cell Viabilty values are written in the generated PDF summary
@@ -42,7 +61,7 @@ Updated files:
 - A new button in the GUI: JSON export for raw data added, which saves a separate JSON file named like [example]_raw_plate_data.json (contains full raw OD values for every well from the processed plate).
 - Added a formatted dose-response table to the exported PDF, where save_pdf_summary() now renders a table with columns, like Konzentration (µM), Wells, SD, RSD (%), Viablität (%). The table uses a header row with fill color and bordered cells for better readability.
 
-### Changes in the Python files ###
+### Changes in the Python files v1.3.0 ###
 - Added the new fitting logic in dose_response.py
 - Estended the analysis summary in analyzer.py
 - Updated the PDF export in main_gui.py
@@ -94,14 +113,14 @@ Updated files:
     - Added dose-response grouping from start concentration
     - Added per-triplicate mean/std/RSD output
 
-### Export behaviour in JSON ###
+### Export behaviour in JSON v1.2.0 ###
 
 The JSON export now contains:
 - the selected well annotations
 - the full analysis summary
 - the raw OD values for all wells under the key raw_plate_daata
 
-### **Results** ###
+### **Results** v1.1.0###
 
 - GUI now supports only:
     - Puromycin

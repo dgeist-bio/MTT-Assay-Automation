@@ -47,7 +47,14 @@ def parse_well_sort_key(well_string):
     return ord(row_char), col_idx
 
 
-def build_dose_response_from_start_triplet(df, start_triplet, blank, start_concentration, reference_value=None):
+def build_dose_response_from_start_triplet(
+    df,
+    start_triplet,
+    blank,
+    start_concentration,
+    reference_value=None,
+    puro_blank_corrected_mean=None,
+):
     """
     Builds dose-response groups starting from a vertical triplet.
     """
@@ -94,9 +101,14 @@ def build_dose_response_from_start_triplet(df, start_triplet, blank, start_conce
             summary["concentration"] = float(current_conc)
             summary["group_index"] = len(dose_response) + 1
             summary["wells"] = group_wells
+            if puro_blank_corrected_mean is not None:
+                summary["baseline_corrected_mean"] = float(summary["blank_corrected_mean"] - puro_blank_corrected_mean)
+            else:
+                summary["baseline_corrected_mean"] = float(summary["blank_corrected_mean"])
+
             if reference_value is not None:
                 try:
-                    summary["viability"] = float((summary["blank_corrected_mean"] / reference_value) * 100) if reference_value else None
+                    summary["viability"] = float((summary["baseline_corrected_mean"] / reference_value) * 100) if reference_value else None
                 except Exception:
                     summary["viability"] = None
             dose_response.append(summary)
@@ -138,7 +150,16 @@ def collect_raw_plate_data(df):
     return plate
 
 
-def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start_concentration=None, start_triplet=None, include_summary=False):
+def calculate_viability(
+    df,
+    puro_wells,
+    dmso_wells=None,
+    blank_wells=None,
+    start_concentration=None,
+    start_triplet=None,
+    include_summary=False,
+    use_puro_baseline=False,
+):
     dmso_wells = dmso_wells or set()
     blank_wells = blank_wells or set()
 
@@ -157,12 +178,26 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
     reference_name = "blank"
     reference_val = 1.0
     if dmso_summary:
-        reference_val = dmso_summary["blank_corrected_mean"] or 1.0
-        reference_name = "dmso"
-        dmso_summary["viability"] = 100.0
+        if use_puro_baseline and puro_summary:
+            baseline_value = dmso_summary["blank_corrected_mean"] - puro_summary["blank_corrected_mean"]
+            if baseline_value and baseline_value > 0:
+                reference_val = float(baseline_value)
+                reference_name = "dmso_minus_puro"
+                dmso_summary["baseline_corrected_mean"] = float(baseline_value)
+                dmso_summary["viability"] = 100.0
+                puro_summary["baseline_corrected_mean"] = 0.0
+                puro_summary["viability"] = 0.0
+            else:
+                reference_val = dmso_summary["blank_corrected_mean"] or 1.0
+                reference_name = "dmso"
+                dmso_summary["viability"] = 100.0
+        else:
+            reference_val = dmso_summary["blank_corrected_mean"] or 1.0
+            reference_name = "dmso"
+            dmso_summary["viability"] = 100.0
 
     puro_viability = None
-    if puro_summary and reference_val:
+    if puro_summary and reference_val and not (use_puro_baseline and reference_name == "dmso_minus_puro"):
         puro_viability = (puro_summary["blank_corrected_mean"] / reference_val) * 100
         puro_summary["viability"] = float(puro_viability)
 
@@ -179,6 +214,7 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
         blank,
         start_concentration,
         reference_value=reference_val,
+        puro_blank_corrected_mean=(puro_summary["blank_corrected_mean"] if use_puro_baseline and puro_summary else None),
     )
 
     z_prime = None
@@ -227,6 +263,7 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
         "blank": float(blank),
         "reference_name": reference_name,
         "reference_value": float(reference_val),
+        "use_puro_baseline": bool(use_puro_baseline),
         "puro": puro_summary,
         "dmso": dmso_summary,
         "mean_difference_blank_corrected": float(mean_diff) if mean_diff is not None else None,
@@ -250,7 +287,10 @@ def calculate_viability(df, puro_wells, dmso_wells=None, blank_wells=None, start
         "raw_plate_data": raw_plate_data,
     }
 
-    full_plate_viability = ((df.iloc[0:8, 1:13] - blank) / reference_val) * 100
+    if use_puro_baseline and puro_summary and reference_name == "dmso_minus_puro":
+        full_plate_viability = (((df.iloc[0:8, 1:13] - blank) - puro_summary["blank_corrected_mean"]) / reference_val) * 100
+    else:
+        full_plate_viability = ((df.iloc[0:8, 1:13] - blank) / reference_val) * 100
 
     status = "OK"
     if puro_summary and puro_viability is not None and puro_viability > 30:

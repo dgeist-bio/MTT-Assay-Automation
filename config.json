@@ -9,11 +9,24 @@
     "export_path": "Desktop/MTT_Results",
     "start_conc_text": "Startkonzentration",
     "heatmap_text": "Automatisierte Heatmap-Generierung (300dpi)",
-    "title": "MTT Auto-Analyzer v1.6.0 - Professional Edition",
+    "title": "MTT Auto-Analyzer v1.7.0 - Professional Edition",
     "geometry": "900x900",
     "label_text": "MTT-Daten Analyse",
     "save_path_text": "Speicherort: Desktop/MTT_Ergebnisse",
+    "save_json_text": "JSON Vorlage speichern",
+    "load_json_text": "JSON Vorlage laden",
     "font_main": ["Arial", 12]},
+
+"messages": {
+    "error_title": "Fehler",
+    "error_message": "Es ist ein Fehler aufgetreten. Bitte überprüfen Sie Ihre Eingaben.",
+    "file_not_found": "Datei nicht gefunden. Bitte überprüfen Sie den Pfad.",
+    "invalid_json": "Ungültige JSON-Datei. Bitte überprüfen Sie die Datei.",
+    "analysis_complete": "Analyse abgeschlossen. PDF wurde erstellt.",
+    "no_data": "Keine Daten zum Analysieren gefunden.",
+    "error_number_triplet": "Es können maximal 3 Wells für das Start-Triplet ausgewählt werden.",
+    "title_message": "MTT Assay - Executive Summary",
+    "invalid_concentration": "Ungültige Startkonzentration. Bitte geben Sie eine positive Zahl ein."},
 
 "buttons": {
     "button_color": "#007BFF",
